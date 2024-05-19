@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import json
 
 def compare_json(json1, json2, path=""):
@@ -32,6 +33,30 @@ def prettify_json(json_str):
         return True, prettified_json
     except json.JSONDecodeError as e:
         return False, str(e)
+    
+def car_loan_total_cost(car_cost, down_payment, annual_apr, loan_term_years):
+    # Calculate the loan amount
+    loan_amount = car_cost - down_payment
+    
+    # Convert APR to a decimal and calculate monthly interest rate
+    monthly_interest_rate = (annual_apr / 100) / 12
+    
+    # Calculate the number of monthly payments
+    total_payments = loan_term_years * 12
+    
+    # Calculate monthly payment using the formula for an installment loan
+    if monthly_interest_rate > 0:
+        monthly_payment = loan_amount * (monthly_interest_rate * (1 + monthly_interest_rate) ** total_payments) / ((1 + monthly_interest_rate) ** total_payments - 1)
+    else:
+        monthly_payment = loan_amount / total_payments
+    
+    # Calculate the total amount paid over the loan term
+    total_paid = monthly_payment * total_payments
+    
+    # Add the down payment to the total amount paid
+    total_cost = total_paid + down_payment
+    
+    return total_cost, total_paid, loan_amount, monthly_payment
 
 def main():
     st.title("JSON Comparator")
@@ -92,6 +117,37 @@ def main():
                 st.error("An unexpected error occurred while comparing JSONs.")
         else:
             st.error("Please prettify & check syntax before comparing.")
+
+    st.title("Car Loan Total Cost Calculator")
+
+    car_cost = st.number_input("Enter the total cost of the car:", min_value=0.0, format="%.2f")
+    down_payment = st.number_input("Enter the down payment:", min_value=0.0, format="%.2f")
+    annual_apr = st.number_input("Enter the annual interest rate (APR) in percent:", min_value=0.0, format="%.2f")
+    loan_term_years = st.number_input("Enter the loan term in years:", min_value=1, format="%d")
+
+    if st.button("Calculate Total Cost"):
+        total_cost, total_paid, loan_amount, monthly_payment = car_loan_total_cost(car_cost, down_payment, annual_apr, loan_term_years)
+        interest_paid = total_paid - loan_amount
+        down_payment_percent = (down_payment / total_cost) * 100
+        loan_amount_percent = (loan_amount / total_cost) * 100
+        interest_paid_percent = (interest_paid / total_cost) * 100
+
+        # Calculate the true cost of owning the car per month
+        true_cost_per_month = monthly_payment
+
+        st.write(f"The total cost paid after the end of the loan period is: ${total_cost:.2f}")
+        st.write(f"The true cost of owning the car per month is: ${true_cost_per_month:.2f}")
+
+        # Create breakdown data for the total term of the loan
+        breakdown_data = {
+            'Category': ['Down Payment', 'Loan Amount', 'Interest Paid'],
+            'Amount': [down_payment, loan_amount, interest_paid]
+        }
+        breakdown_df = pd.DataFrame(breakdown_data)
+
+        # Display the breakdown of costs over the total term of the loan
+        st.write("Breakdown of Costs Over the Total Term of the Loan:")
+        st.bar_chart(breakdown_df.set_index('Category'))
 
 if __name__ == "__main__":
     main()
